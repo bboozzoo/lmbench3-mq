@@ -85,7 +85,7 @@ ASMS =  $O/bw_file_rd.s $O/bw_mem.s $O/bw_mmap_rd.s $O/bw_pipe.s 	\
 	$O/lat_pagefault.s $O/lat_pipe.s $O/lat_proc.s $O/lat_rpc.s	\
 	$O/lat_select.s $O/lat_sig.s $O/lat_syscall.s $O/lat_tcp.s	\
 	$O/lat_udp.s $O/lat_unix.s $O/lat_unix_connect.s $O/lat_sem.s	\
-	$0/lat_mq.s \
+	$O/lat_mq.s \
 	$O/lib_debug.s $O/lib_mem.s	\
 	$O/lib_stats.s $O/lib_tcp.s $O/lib_timing.s $O/lib_udp.s	\
 	$O/lib_unix.s $O/lib_sched.s					\
@@ -99,7 +99,7 @@ EXES =	$O/bw_file_rd $O/bw_mem $O/bw_mmap_rd $O/bw_pipe $O/bw_tcp 	\
 	$O/lat_select $O/lat_pipe $O/lat_rpc $O/lat_syscall $O/lat_tcp	\
 	$O/lat_udp $O/lat_mmap $O/mhz $O/lat_proc $O/lat_pagefault	\
 	$O/lat_connect $O/lat_fs $O/lat_sig $O/lat_mem_rd $O/lat_ctx	\
-	$O/lat_sem $0/lat_mq							\
+	$O/lat_sem $O/lat_mq							\
 	$O/memsize $O/lat_unix $O/lmdd $O/timing_o $O/enough		\
 	$O/msleep $O/loop_o $O/lat_fifo $O/lmhttp $O/lat_http		\
 	$O/lat_fcntl $O/disk $O/lat_unix_connect $O/flushdisk		\
@@ -389,7 +389,7 @@ $O/lat_pipe:  lat_pipe.c timing.h stats.h bench.h $O/lmbench.a
 
 $O/lat_mq.s:lat_mq.c timing.h stats.h bench.h
 $O/lat_mq:  lat_mq.c timing.h stats.h bench.h $O/lmbench.a
-	$(COMPILE) -o $O/lat_mq lat_mq.c $O/lmbench.a $(LDLIBS)
+	$(COMPILE) -o $O/lat_mq lat_mq.c $O/lmbench.a $(LDLIBS) -lrt
 
 $O/lat_fifo.s:lat_fifo.c timing.h stats.h bench.h
 $O/lat_fifo:  lat_fifo.c timing.h stats.h bench.h $O/lmbench.a

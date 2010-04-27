@@ -6,6 +6,7 @@
  * based on lat_pipe.c
  */
 char	*id = "$Id$\n";
+char buf[8192] = {0};
 
 #include "bench.h"
 #include <mqueue.h>
@@ -13,7 +14,7 @@ char	*id = "$Id$\n";
 void initialize(iter_t iterations, void *cookie);
 void cleanup(iter_t iterations, void *cookie);
 void doit(iter_t iterations, void *cookie);
-void writer(int w, int r);
+void childloop(mqd_t mq);
 
 typedef struct _state {
 	int	pid;
@@ -64,15 +65,41 @@ initialize(iter_t iterations, void* cookie)
 {
 	char	c;
 	state_t * state = (state_t *)cookie;
+    struct mq_attr attr;
+
 
 	if (iterations) return;
 
-    state->mq = mq_open("testqueue", O_CREAT | O_EXCL);
+    memset(&attr, 0, sizeof(attr));
+    attr.mq_flags = 0;
+    attr.mq_maxmsg = 1;
+    attr.mq_msgsize = 1;
+    attr.mq_curmsgs = 0;
+    state->mq = mq_open("/testqueue", O_CREAT | O_RDWR, 0666, &attr);
     if (state->mq == -1) {
         perror("mq_open");
         return;
     }
+    fprintf(stderr, "mq fd: %d\n", state->mq);
+    mq_getattr(state->mq, &attr);
+    fprintf(stderr, "attrs\n");
+    fprintf(stderr, "flags: 0x%x\n", attr.mq_flags);
+    fprintf(stderr, "maxmsg: %ld\n", attr.mq_maxmsg);
+    fprintf(stderr, "msgsize: %ld\n", attr.mq_msgsize);
+    fprintf(stderr, "curmsg: %ld\n", attr.mq_curmsgs);
+    attr.mq_msgsize = 1;
+    attr.mq_maxmsg = 1;
+    if (mq_setattr(state->mq, &attr, NULL) == -1) {
+        perror("mq_setattr");
+        return;
+    }
+    mq_getattr(state->mq, &attr);
 
+    fprintf(stderr, "attrs\n");
+    fprintf(stderr, "flags: 0x%x\n", attr.mq_flags);
+    fprintf(stderr, "maxmsg: %ld\n", attr.mq_maxmsg);
+    fprintf(stderr, "msgsize: %ld\n", attr.mq_msgsize);
+    fprintf(stderr, "curmsg: %ld\n", attr.mq_curmsgs);
 	handle_scheduler(benchmp_childid(), 0, 1);
 	switch (state->pid = fork()) {
 	    case 0:
@@ -92,10 +119,20 @@ initialize(iter_t iterations, void* cookie)
 	/*
 	 * One time around to make sure both processes are started.
 	 */
-	if (write(state->p1[1], &c, 1) != 1 || read(state->p2[0], &c, 1) != 1){
-		perror("(i) read/write on pipe");
+#if 1
+    {
+        int snd = 0;
+        int rcv = 0;
+        snd = mq_send(state->mq, &c, 1, 0);
+        rcv = mq_receive(state->mq, buf, sizeof(buf), NULL);
+        fprintf(stderr, "snd: %d rcv: %d\n", snd, rcv);
+        /*
+	if (mq_send(state->mq, &c, 1, 0) != -1 || mq_receive(state->mq, buf, sizeof(buf), NULL) != 1){
+		perror("(i) read/write on mq");
 		exit(1);
-	}
+	} */
+    }
+#endif
 }
 
 void 
@@ -110,6 +147,8 @@ cleanup(iter_t iterations, void* cookie)
 		waitpid(state->pid, NULL, 0);
 		state->pid = 0;
 	}
+    mq_close(state->mq);
+    mq_unlink("/testqueue");
 }
 
 void 
@@ -118,27 +157,30 @@ doit(register iter_t iterations, void *cookie)
 	state_t *state = (state_t *) cookie;
 	char		c;
 	register char	*cptr = &c;
-    register mqd_t * mq = state->mq;
+    register mqd_t mq = state->mq;
 
 	while (iterations-- > 0) {
-		if (mq_send(mq, cptr, sizeof(c), 0) != 1 ||
-		    mq_receive(mq, cptr, sizeof(c), NULL) != 1) {
+		if (mq_send(mq, cptr, sizeof(c), 0) == -1 ||
+		    mq_receive(mq, buf, sizeof(buf), NULL) == -1) {
 			perror("(r) receive/send on mq");
+            mq_close(mq);
 			exit(1);
 		}
 	}
 }
 
 void 
-writer(mqd_t mq)
+childloop(mqd_t mq)
 {
 	char		c;
 	register char	*cptr = &c;
 
 	for ( ;; ) {
-		if (mq_receive(mq, cptr, sizeof(c), NULL) != 1 ||
-			mq_send(mq, cptr, sizeof(c), 0) != 1) {
+		if (mq_receive(mq, buf, sizeof(buf), NULL) == -1 ||
+			mq_send(mq, cptr, sizeof(c), 0) == -1) {
 			    perror("(w) receive/send on mq");
+                mq_close(mq);
+                exit(1);
 		}
 	}
 }
